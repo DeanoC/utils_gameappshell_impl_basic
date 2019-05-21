@@ -3,7 +3,7 @@
 #define UTILS_GAMEAPPSHELL_BASIC_WINDOWS_PLATFORM_H
 
 typedef struct GameAppShellBasic_Win32Window {
-	GameAppShellBasic_WindowDesc desc;
+	GameAppShell_WindowDesc desc;
   HWND hwnd;
 } GameAppShellBasic_Win32Window;
 

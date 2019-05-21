@@ -1,38 +1,49 @@
-#include "core/core.h"
-#include "core/windows.h"
-#include "guishell/guishell.hpp"
-#include "guishell/platform.h"
-#include "tinystl/vector.h"
+#include "al2o3_platform/platform.h"
+#include "al2o3_platform/windows.h"
+#include "utils_gameappshell/gameappshell.h"
+#include "utils_gameappshell/windows/platform.h"
+#include "al2o3_tinystl/vector.hpp"
 #include <fcntl.h>
 #include <io.h>
 #include <stdio.h>
 #include <ios>
 
-GuiShell_Functions gGuiShellFunctions = {};
+#define APP_ABORT if (gGameAppShell.onAbortCallback) { \
+										gGameAppShell.onAbortCallback(); \
+									} else { \
+										abort(); \
+									}
+#define APP_CALLBACK_RET(x) ((gGameAppShell.x) ?  gGameAppShell.x() : true)
+#define APP_CALLBACK(x) if(gGameAppShell.x) { gGameAppShell.x(); }
 
-struct WindowsSpecific {
-  void createStandardArgs(LPSTR command_line);
-  void getMessages(void);
-  void ensureConsoleWindowsExists();
-  bool registerClass(GuiShell_WindowDesc desc);
-  uint32_t createWindow(GuiShell_WindowDesc desc);
-  void destroyWindow(uint32_t index);
-
-  HINSTANCE hInstance;
-  HINSTANCE hPrevInstance;
-  int nCmdShow;
-
-  tinystl::vector<GuiShell_Win32Window> windows;
-
-  static const int MAX_CMDLINE_ARGS = 1024;
-
-  int argc;
-  char *argv[MAX_CMDLINE_ARGS];
-  char moduleFilename[MAX_PATH];
-  bool windowsQuit = false;
-} gWindowsSpecific;
 
 namespace {
+
+GameAppShell_Shell gGameAppShell = {};
+GameAppShellBasic_Win32Window gMainWindow = {};
+
+struct WindowsSpecific {
+	void createStandardArgs(LPSTR command_line);
+	void getMessages(void);
+	void ensureConsoleWindowsExists();
+	bool registerClass(GameAppShell_WindowDesc desc);
+	uint32_t createWindow(GameAppShell_WindowDesc desc);
+	void destroyWindow(uint32_t index);
+
+	HINSTANCE hInstance;
+	HINSTANCE hPrevInstance;
+	int nCmdShow;
+
+	tinystl::vector<GameAppShellBasic_Win32Window> windows;
+
+	static const int MAX_CMDLINE_ARGS = 1024;
+
+	int argc;
+	char *argv[MAX_CMDLINE_ARGS];
+	char moduleFilename[MAX_PATH];
+	bool windowsQuit = false;
+} gWindowsSpecific;
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
   switch (message) {
     case WM_DESTROY:gWindowsSpecific.windowsQuit = true;
@@ -165,7 +176,7 @@ void WindowsSpecific::ensureConsoleWindowsExists() {
   ios::sync_with_stdio();
 }
 
-bool WindowsSpecific::registerClass(GuiShell_WindowDesc desc) {
+bool WindowsSpecific::registerClass(GameAppShell_WindowDesc desc) {
   // Register class
   WNDCLASSEX wcex;
   wcex.cbSize = sizeof(WNDCLASSEX);
@@ -187,18 +198,24 @@ bool WindowsSpecific::registerClass(GuiShell_WindowDesc desc) {
   return true;
 }
 
-uint32_t WindowsSpecific::createWindow(GuiShell_WindowDesc desc) {
+uint32_t WindowsSpecific::createWindow(GameAppShell_WindowDesc desc) {
   // Create window
-  RECT rc = {0, 0, (LONG) desc.width, (LONG) desc.height};
-  DWORD style = WS_OVERLAPPEDWINDOW | WS_VISIBLE;
-  DWORD styleEx = 0;
-  if (desc.fullScreen == false) {
-    AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
+  if (desc.width == -1 || desc.width == 0) {
+		desc.width = 1920;
   }
-  if (desc.width == -1 || desc.height == -1) {
-    desc.width = 1920;
-    desc.height = 1080;
+  if( desc.height == -1 || desc.height == 0) {
+		desc.height = 1080;
   }
+
+	RECT rc = {0, 0, (LONG) desc.width, (LONG) desc.height};
+	DWORD style = WS_OVERLAPPEDWINDOW | WS_VISIBLE;
+	DWORD styleEx = 0;
+	if (desc.fullScreen == false) {
+		AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
+		desc.width = rc.right;
+		desc.height = rc.bottom;
+	}
+
   HWND hwnd = CreateWindowEx(styleEx,
                              desc.name,
                              desc.name,
@@ -212,7 +229,7 @@ uint32_t WindowsSpecific::createWindow(GuiShell_WindowDesc desc) {
   gWindowsSpecific.getMessages();
   ShowWindow(hwnd, gWindowsSpecific.nCmdShow);
   gWindowsSpecific.getMessages();
-  gWindowsSpecific.windows.emplace_back(GuiShell_Win32Window{desc, hwnd});
+  gWindowsSpecific.windows.emplace_back(GameAppShellBasic_Win32Window{desc, hwnd});
 
   return (uint32_t) gWindowsSpecific.windows.size() - 1;
 }
@@ -227,60 +244,7 @@ void WindowsSpecific::destroyWindow(uint32_t index) {
   gWindowsSpecific.windows[index].hwnd = nullptr;
 }
 
-int Main(int argc, char *argv[]) {
-  bool okay = true;
-
-  GuiShell_WindowDesc desc{};
-  GuiShell_AppConfig(&gGuiShellFunctions, &desc);
-
-  gWindowsSpecific.registerClass(desc);
-  uint32_t mainWindowIndex = gWindowsSpecific.createWindow(desc);
-  ASSERT(mainWindowIndex == 0);
-
-  if (gGuiShellFunctions.init && !gGuiShellFunctions.init()) {
-    if (gGuiShellFunctions.abort) {
-      gGuiShellFunctions.abort();
-    } else {
-      gWindowsSpecific.windowsQuit = false;
-    }
-    okay = false;
-  }
-  if (gGuiShellFunctions.load && !gGuiShellFunctions.load()) {
-    if (gGuiShellFunctions.abort) {
-      gGuiShellFunctions.abort();
-    } else {
-      gWindowsSpecific.windowsQuit = false;
-    }
-    okay = false;
-  }
-
-  while (gWindowsSpecific.windowsQuit == false) {
-    // TODO timing
-    double deltaTimeMS = 18.0;
-
-    gWindowsSpecific.getMessages();
-    if (gGuiShellFunctions.update) {
-      gGuiShellFunctions.update(deltaTimeMS);
-    }
-    if (gGuiShellFunctions.draw) {
-      gGuiShellFunctions.draw();
-    }
-  }
-
-  gWindowsSpecific.destroyWindow(mainWindowIndex);
-
-  if (gGuiShellFunctions.unload) {
-    gGuiShellFunctions.unload();
-  }
-
-  if (gGuiShellFunctions.exit) {
-    gGuiShellFunctions.exit();
-  }
-
-  return okay ? 0 : 10;
-}
-
-EXTERN_C int LibWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+EXTERN_C int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
   gWindowsSpecific.hInstance = hInstance;
   gWindowsSpecific.hPrevInstance = hPrevInstance;
   gWindowsSpecific.nCmdShow = nCmdShow;
@@ -289,19 +253,69 @@ EXTERN_C int LibWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCm
   gWindowsSpecific.createStandardArgs(lpCmdLine);
 //  gWindowsSpecific.ensureConsoleWindowsExists();
 
-  return Main(gWindowsSpecific.argc, gWindowsSpecific.argv);
+	extern int main(int argc, char const *argv[]);
+
+  return main(gWindowsSpecific.argc, (char const**)gWindowsSpecific.argv);
 }
 
 // GuiShell Window API
-EXTERN_C void GuiShell_WindowGetCurrentDesc(GuiShell_WindowDesc *desc) {
+AL2O3_EXTERN_C void GameAppShell_WindowGetCurrentDesc(GameAppShell_WindowDesc *desc) {
   ASSERT(desc);
-  memcpy(desc, &gWindowsSpecific.windows[0].desc, sizeof(GuiShell_WindowDesc));
+  memcpy(desc, &gWindowsSpecific.windows[0].desc, sizeof(GameAppShell_WindowDesc));
 }
 
-EXTERN_C void GuiShell_Terminate() {
-  gWindowsSpecific.windowsQuit = true;
+AL2O3_EXTERN_C void GameAppShell_Quit() {
+	gWindowsSpecific.windowsQuit = true;
 }
 
-EXTERN_C void *GuiShell_GetPlatformWindowPtr() {
+AL2O3_EXTERN_C GameAppShell_Shell *GameAppShell_Init()
+{
+	return &gGameAppShell;
+}
+
+AL2O3_EXTERN_C int GameAppShell_MainLoop(int argc, char const *argv[]) {
+	if(gGameAppShell.initialWindowDesc.name == NULL) {
+		gGameAppShell.initialWindowDesc.name = "No name for al2o3 app specified";
+	}
+
+	bool okay = true;
+	GameAppShell_WindowDesc& desc = gGameAppShell.initialWindowDesc;
+	gWindowsSpecific.registerClass(desc);
+	uint32_t mainWindowIndex = gWindowsSpecific.createWindow(desc);
+	ASSERT(mainWindowIndex == 0);
+
+	if(!APP_CALLBACK_RET(onInitCallback))
+	{
+		APP_ABORT
+		okay = false;
+	}
+	if(!APP_CALLBACK_RET(onDisplayLoadCallback)) {
+		APP_ABORT;
+		okay = false;
+	}
+
+	while (gWindowsSpecific.windowsQuit == false) {
+		// TODO timing
+		double deltaTimeMS = 18.0;
+
+		gWindowsSpecific.getMessages();
+
+		if (gGameAppShell.perFrameUpdateCallback) {
+			gGameAppShell.perFrameUpdateCallback(deltaTimeMS);
+		}
+		if (gGameAppShell.perFrameDrawCallback) {
+			gGameAppShell.perFrameDrawCallback(deltaTimeMS);
+		}
+	}
+
+	gWindowsSpecific.destroyWindow(mainWindowIndex);
+
+	APP_CALLBACK(onDisplayUnloadCallback);
+	APP_CALLBACK(onQuitCallback)
+
+	return okay ? 0 : 10;
+}
+
+AL2O3_EXTERN_C void *GameAppShell_GetPlatformWindowPtr() {
   return &gWindowsSpecific.windows[0];
 }
