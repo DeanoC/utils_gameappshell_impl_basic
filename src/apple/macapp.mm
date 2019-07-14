@@ -245,5 +245,5 @@ AL2O3_EXTERN_C void GameAppShell_Quit() {
 }
 
 AL2O3_EXTERN_C void* GameAppShell_GetPlatformWindowPtr() {
-  return &gMainWindow;
+  return (__bridge void*)[gMainWindow.metalView window];
 }
