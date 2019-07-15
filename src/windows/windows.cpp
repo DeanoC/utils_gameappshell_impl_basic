@@ -317,5 +317,5 @@ AL2O3_EXTERN_C int GameAppShell_MainLoop(int argc, char const *argv[]) {
 }
 
 AL2O3_EXTERN_C void *GameAppShell_GetPlatformWindowPtr() {
-  return &gWindowsSpecific.windows[0];
+  return gWindowsSpecific.windows[0].hwnd;
 }
