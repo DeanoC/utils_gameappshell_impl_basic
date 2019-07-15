@@ -39,11 +39,12 @@ if (APPLE)
 	target_link_libraries(${LibName} PRIVATE "-framework Metal -framework MetalKit")
 endif ()
 
-
-set( Tests
-		runner.cpp
-		)
-set( TestDeps
-		al2o3_catch2
-		utils_simple_logmanager)
-ADD_LIB_GUITESTS(${LibName} "${Interface}" "${Tests}" "${TestDeps}" utils_gameappshell_interface)
+if(BUILD_TESTS)
+	set( Tests
+			runner.cpp
+			)
+	set( TestDeps
+			al2o3_catch2
+			utils_simple_logmanager)
+	ADD_LIB_GUITESTS(${LibName} "${Interface}" "${Tests}" "${TestDeps}" utils_gameappshell_interface)
+endif()
