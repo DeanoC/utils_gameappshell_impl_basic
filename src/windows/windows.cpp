@@ -15,12 +15,13 @@
 									}
 #define APP_CALLBACK_RET(x) ((gGameAppShell.x) ?  gGameAppShell.x() : true)
 #define APP_CALLBACK(x) if(gGameAppShell.x) { gGameAppShell.x(); }
+#define APP_CALLBACK1(x, arg0) if(gGameAppShell.x) { gGameAppShell.x(arg0); }
 
 
 namespace {
 
-GameAppShell_Shell gGameAppShell = {};
-GameAppShellBasic_Win32Window gMainWindow = {};
+GameAppShell_Shell gGameAppShell {};
+GameAppShellBasic_Win32Window gMainWindow {};
 
 struct WindowsSpecific {
 	void createStandardArgs(LPSTR command_line);
@@ -116,6 +117,8 @@ void WindowsSpecific::getMessages(void) {
     while (PeekMessage(&Message, NULL, 0, 0, PM_REMOVE)) {
       TranslateMessage(&Message);
       DispatchMessage(&Message);
+
+			APP_CALLBACK1(onMsgCallback, &Message);
     }
   } else {
     for (auto window : windows) {
@@ -123,6 +126,7 @@ void WindowsSpecific::getMessages(void) {
       while (PeekMessage(&Message, window.hwnd, 0, 0, PM_REMOVE)) {
         TranslateMessage(&Message);
         DispatchMessage(&Message);
+				APP_CALLBACK1(onMsgCallback, &Message);
       }
     }
   }
