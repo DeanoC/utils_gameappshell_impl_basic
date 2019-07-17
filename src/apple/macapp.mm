@@ -1,14 +1,12 @@
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 #import <MetalKit/MetalKit.h>
-#include <AppKit/NSOpenPanel.h>
-#include <AppKit/AppKit.h>
 
 #include "al2o3_platform/platform.h"
 #include "al2o3_os/filesystem.hpp"
 #include "utils_gameappshell/gameappshell.h"
-#include "utils_gameappshell/windowdesc.h"
 #include "utils_gameappshell/apple/platform.h"
+#include "al2o3_os/time.h"
 #include "macapp.hpp"
 
 #define APP_ABORT if (gGameAppShell.onAbortCallback) { \
@@ -59,7 +57,7 @@ AL2O3_EXTERN_C int GameAppShell_MainLoop(int argc, char const *argv[]) {
   _view.device = _device;
   _view.paused = NO;
   _view.enableSetNeedsDisplay = NO;
-  _view.preferredFramesPerSecond = 60.0;
+  _view.preferredFramesPerSecond = 60;
   [_view.window makeFirstResponder:self];
   _view.autoresizesSubviews = YES;
 
@@ -88,6 +86,8 @@ AL2O3_EXTERN_C int GameAppShell_MainLoop(int argc, char const *argv[]) {
                                            selector:@selector(applicationWillTerminate:)
                                                name:NSApplicationWillTerminateNotification
                                              object:app];
+
+	[self.view.window makeKeyWindow];
 }
 
 /*A notification named NSApplicationWillTerminateNotification.*/
@@ -113,7 +113,6 @@ AL2O3_EXTERN_C int GameAppShell_MainLoop(int argc, char const *argv[]) {
 - (void)drawInMTKView:(nonnull MTKView *)view {
   @autoreleasepool {
     [_application update];
-    [_application updateInput];
     //this is needed for NON Vsync mode.
     //This enables to force update the display
     if (_view.enableSetNeedsDisplay == YES) {
@@ -199,12 +198,10 @@ AL2O3_EXTERN_C int GameAppShell_MainLoop(int argc, char const *argv[]) {
   }
 }
 
-- (void)updateInput {
-}
-
 - (void)update {
-  // TODO Deano
-  double deltaTimeMS = 33.0;//deltaTimer.GetMSec(true) / 1000.0f;
+
+	static double lastTimeMs = (double)Os_GetSystemTime();
+  double deltaTimeMS = Os_GetSystemTime() - lastTimeMs;
   // if framerate appears to drop below about 6, assume we're at a breakpoint and simulate 20fps.
   if (deltaTimeMS > 0.15) {
     deltaTimeMS = 0.05;
@@ -213,22 +210,9 @@ AL2O3_EXTERN_C int GameAppShell_MainLoop(int argc, char const *argv[]) {
 	if(gGameAppShell.perFrameUpdateCallback) { gGameAppShell.perFrameUpdateCallback(deltaTimeMS); }
 	if(gGameAppShell.perFrameDrawCallback) { gGameAppShell.perFrameDrawCallback(deltaTimeMS); }
 
-#ifdef AUTOMATED_TESTING
-  testingCurrentFrameCount++;
-    if (testingCurrentFrameCount >= testingMaxFrameCount)
-    {
-        for (NSWindow* window in [NSApplication sharedApplication].windows)
-        {
-            [window close];
-        }
-
-        [NSApp terminate:nil];
-    }
-#endif
 }
 
 - (void)shutdown {
-//  InputSystem::Shutdown();
 	APP_CALLBACK(onDisplayUnloadCallback)
 	APP_CALLBACK(onQuitCallback)
 }

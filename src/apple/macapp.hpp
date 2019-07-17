@@ -23,7 +23,6 @@
     view:(nonnull MTKView *)view;
 
 - (void)drawRectResized:(CGSize)size;
-- (void)updateInput;
 - (void)update;
 - (void)shutdown;
 
