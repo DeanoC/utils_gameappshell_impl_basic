@@ -27,8 +27,8 @@ struct WindowsSpecific {
 	void createStandardArgs(LPSTR command_line);
 	void getMessages(void);
 	void ensureConsoleWindowsExists();
-	bool registerClass(GameAppShell_WindowDesc desc);
-	uint32_t createWindow(GameAppShell_WindowDesc desc);
+	bool registerClass(GameAppShell_WindowDesc const &desc);
+	uint32_t createWindow(GameAppShell_WindowDesc &desc);
 	void destroyWindow(uint32_t index);
 
 	HINSTANCE hInstance;
@@ -180,7 +180,7 @@ void WindowsSpecific::ensureConsoleWindowsExists() {
   ios::sync_with_stdio();
 }
 
-bool WindowsSpecific::registerClass(GameAppShell_WindowDesc desc) {
+bool WindowsSpecific::registerClass(GameAppShell_WindowDesc const& desc) {
   // Register class
   WNDCLASSEX wcex;
   wcex.cbSize = sizeof(WNDCLASSEX);
@@ -202,7 +202,7 @@ bool WindowsSpecific::registerClass(GameAppShell_WindowDesc desc) {
   return true;
 }
 
-uint32_t WindowsSpecific::createWindow(GameAppShell_WindowDesc desc) {
+uint32_t WindowsSpecific::createWindow(GameAppShell_WindowDesc& desc) {
   // Create window
   if (desc.width == -1 || desc.width == 0) {
 		desc.width = 1920;
@@ -212,13 +212,9 @@ uint32_t WindowsSpecific::createWindow(GameAppShell_WindowDesc desc) {
   }
 
 	RECT rc = {0, 0, (LONG) desc.width, (LONG) desc.height};
-	DWORD style = WS_OVERLAPPEDWINDOW | WS_VISIBLE;
+	DWORD style = WS_VISIBLE;
 	DWORD styleEx = 0;
-	if (desc.fullScreen == false) {
-		AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
-		desc.width = rc.right;
-		desc.height = rc.bottom;
-	}
+	if(!desc.fullScreen) style |= WS_OVERLAPPEDWINDOW;
 
   HWND hwnd = CreateWindowEx(styleEx,
                              desc.name,
@@ -230,6 +226,11 @@ uint32_t WindowsSpecific::createWindow(GameAppShell_WindowDesc desc) {
                              gWindowsSpecific.hInstance,
                              nullptr);
   if (!hwnd) { return ~0u; }
+
+  GetClientRect(hwnd, &rc);
+  desc.width = rc.right - rc.left;
+  desc.height = rc.bottom - rc.top;
+
   gWindowsSpecific.getMessages();
   ShowWindow(hwnd, gWindowsSpecific.nCmdShow);
   gWindowsSpecific.getMessages();
