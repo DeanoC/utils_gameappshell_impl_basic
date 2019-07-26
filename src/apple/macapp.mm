@@ -34,6 +34,8 @@ AL2O3_EXTERN_C int GameAppShell_MainLoop(int argc, char const *argv[]) {
 	if(gGameAppShell.initialWindowDesc.name == NULL) {
 		gGameAppShell.initialWindowDesc.name = "No name for al2o3 app specified";
 	}
+	Os::FileSystem::SetCurrentDir(Os::FileSystem::GetExePath());
+	memcpy(&gMainWindow.desc, &gGameAppShell.initialWindowDesc, sizeof(GameAppShell_WindowDesc));
 
 	return NSApplicationMain(argc, (char const**)argv);
 }
@@ -61,14 +63,9 @@ AL2O3_EXTERN_C int GameAppShell_MainLoop(int argc, char const *argv[]) {
   [_view.window makeFirstResponder:self];
   _view.autoresizesSubviews = YES;
 
-  // Adjust window size to match retina scaling.
-  gMainWindow.retinaScale[0] = (float) (_view.drawableSize.width / _view.frame.size.width);
-  gMainWindow.retinaScale[1] = (float) (_view.drawableSize.height / _view.frame.size.height);
-
-  NSSize windowSize = CGSizeMake(_view.frame.size.width / gMainWindow.retinaScale[0],
-                                 _view.frame.size.height / gMainWindow.retinaScale[1]);
-  [_view.window setContentSize:windowSize];
-  [_view.window setCollectionBehavior:NSWindowCollectionBehaviorFullScreenPrimary];
+	CGFloat scale = [_view.window backingScaleFactor];
+	gMainWindow.desc.dpiBackingScale[0] = (float)scale;
+	gMainWindow.desc.dpiBackingScale[1] = (float)scale;
 
   if (!_device) {
     NSLog(@"Metal is not supported on this device");
@@ -137,9 +134,6 @@ AL2O3_EXTERN_C int GameAppShell_MainLoop(int argc, char const *argv[]) {
   self = [super init];
 
   if (self) {
-    Os::FileSystem::SetCurrentDir(Os::FileSystem::GetExePath());
-
-    memcpy(&gMainWindow.desc, &gGameAppShell.initialWindowDesc, sizeof(GameAppShell_WindowDesc));
     gMainWindow.metalView = view;
 
     if (gGameAppShell.initialWindowDesc.width == -1 ||
@@ -182,8 +176,8 @@ AL2O3_EXTERN_C int GameAppShell_MainLoop(int argc, char const *argv[]) {
 }
 
 - (void)drawRectResized:(CGSize)size {
-  float const newWidth = (float) size.width * gMainWindow.retinaScale[0];
-  float const newHeight = (float) size.height * gMainWindow.retinaScale[1];
+  float const newWidth = (float) size.width;
+  float const newHeight = (float) size.height;
 
   if (newWidth != gMainWindow.desc.width ||
       newHeight != gMainWindow.desc.height) {

@@ -6,7 +6,6 @@
 typedef struct GameAppShellBasic_AppleWindow {
 	GameAppShell_WindowDesc desc;
 	MTKView *_Nonnull metalView;
-	float retinaScale[2];
 } GameAppShellBasic_AppleWindow;
 
 
