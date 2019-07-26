@@ -192,7 +192,7 @@ AL2O3_EXTERN_C int GameAppShell_MainLoop(int argc, char const *argv[]) {
     gMainWindow.desc.height = (uint32_t) newHeight;
 
     APP_CALLBACK(onDisplayUnloadCallback);
-		if( APP_CALLBACK_RET(onDisplayLoadCallback) ) {
+		if( !APP_CALLBACK_RET(onDisplayLoadCallback) ) {
 			APP_ABORT
 		}
   }
