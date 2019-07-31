@@ -315,10 +315,10 @@ AL2O3_EXTERN_C int GameAppShell_MainLoop(int argc, char const *argv[]) {
 		}
 	}
 
-	gWindowsSpecific.destroyWindow(mainWindowIndex);
-
 	APP_CALLBACK(onDisplayUnloadCallback);
 	APP_CALLBACK(onQuitCallback)
+
+	gWindowsSpecific.destroyWindow(mainWindowIndex);
 
 	return okay ? 0 : 10;
 }
