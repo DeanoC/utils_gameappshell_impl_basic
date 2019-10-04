@@ -28,14 +28,15 @@ AL2O3_EXTERN_C GameAppShell_Shell *GameAppShell_Init() {
 	return &gGameAppShell;
 }
 
-AL2O3_EXTERN_C int GameAppShell_MainLoop(int argc, char const *argv[]) {
+AL2O3_EXTERN_C void GameAppShell_MainLoop(int argc, char const *argv[]) {
 	if (gGameAppShell.initialWindowDesc.name == NULL) {
 		gGameAppShell.initialWindowDesc.name = "No name for al2o3 app specified";
 	}
 	Os::FileSystem::SetCurrentDir(Os::FileSystem::GetExePath());
 	memcpy(&gMainWindow.desc, &gGameAppShell.initialWindowDesc, sizeof(GameAppShell_WindowDesc));
 
-	return NSApplicationMain(argc, (char const **) argv);
+	// never returns and ignores arguements.
+	NSApplicationMain(argc, (char const **) argv);
 }
 /************************************************************************/
 // GameViewController implementation
