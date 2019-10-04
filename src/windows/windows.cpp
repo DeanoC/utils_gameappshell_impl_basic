@@ -280,12 +280,11 @@ AL2O3_EXTERN_C GameAppShell_Shell *GameAppShell_Init()
 	return &gGameAppShell;
 }
 
-AL2O3_EXTERN_C int GameAppShell_MainLoop(int argc, char const *argv[]) {
+AL2O3_EXTERN_C void GameAppShell_MainLoop(int argc, char const *argv[]) {
 	if(gGameAppShell.initialWindowDesc.name == NULL) {
 		gGameAppShell.initialWindowDesc.name = "No name for al2o3 app specified";
 	}
 
-	bool okay = true;
 	GameAppShell_WindowDesc& desc = gGameAppShell.initialWindowDesc;
 	gWindowsSpecific.registerClass(desc);
 	uint32_t mainWindowIndex = gWindowsSpecific.createWindow(desc);
@@ -294,11 +293,11 @@ AL2O3_EXTERN_C int GameAppShell_MainLoop(int argc, char const *argv[]) {
 	if(!APP_CALLBACK_RET(onInitCallback))
 	{
 		APP_ABORT
-		okay = false;
+		return;
 	}
 	if(!APP_CALLBACK_RET(onDisplayLoadCallback)) {
 		APP_ABORT;
-		okay = false;
+		return;
 	}
 
 	while (gWindowsSpecific.windowsQuit == false) {
@@ -319,8 +318,6 @@ AL2O3_EXTERN_C int GameAppShell_MainLoop(int argc, char const *argv[]) {
 	APP_CALLBACK(onQuitCallback)
 
 	gWindowsSpecific.destroyWindow(mainWindowIndex);
-
-	return okay ? 0 : 10;
 }
 
 AL2O3_EXTERN_C void *GameAppShell_GetPlatformWindowPtr() {
