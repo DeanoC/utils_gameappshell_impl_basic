@@ -2,7 +2,6 @@
 #include "al2o3_platform/windows.h"
 #include "utils_gameappshell/gameappshell.h"
 #include "utils_gameappshell/windows/platform.h"
-#include "al2o3_tinystl/vector.hpp"
 #include <fcntl.h>
 #include <io.h>
 #include <stdio.h>
@@ -35,10 +34,11 @@ struct WindowsSpecific {
 	HINSTANCE hPrevInstance;
 	int nCmdShow;
 
-	tinystl::vector<GameAppShellBasic_Win32Window> windows;
-
+	static const int MAX_WINDOWS = 100;
 	static const int MAX_CMDLINE_ARGS = 1024;
 
+	GameAppShellBasic_Win32Window windows[MAX_WINDOWS];
+	uint32_t windowCount;
 	int argc;
 	char *argv[MAX_CMDLINE_ARGS];
 	char moduleFilename[MAX_PATH];
@@ -112,7 +112,7 @@ void WindowsSpecific::createStandardArgs(LPSTR command_line) {
 
 //! Pumps windows messages
 void WindowsSpecific::getMessages(void) {
-  if (windows.empty()) {
+  if (windowCount > 0) {
     MSG Message;
     while (PeekMessage(&Message, NULL, 0, 0, PM_REMOVE)) {
       TranslateMessage(&Message);
@@ -236,14 +236,14 @@ uint32_t WindowsSpecific::createWindow(GameAppShell_WindowDesc& desc) {
   gWindowsSpecific.getMessages();
   ShowWindow(hwnd, gWindowsSpecific.nCmdShow);
   gWindowsSpecific.getMessages();
-  gWindowsSpecific.windows.emplace_back(GameAppShellBasic_Win32Window{desc, hwnd});
+  gWindowsSpecific.windows[windowCount++] = {desc, hwnd};
 
-  return (uint32_t) gWindowsSpecific.windows.size() - 1;
+  return windowCount - 1;
 }
 
 void WindowsSpecific::destroyWindow(uint32_t index) {
   if (index == ~0u) { return; }
-  if (index >= gWindowsSpecific.windows.size()) { return; }
+  if (index >= windowCount) { return; }
 
   if (gWindowsSpecific.windows[index].hwnd == nullptr) { return; }
 
@@ -321,5 +321,6 @@ AL2O3_EXTERN_C void GameAppShell_MainLoop(int argc, char const *argv[]) {
 }
 
 AL2O3_EXTERN_C void *GameAppShell_GetPlatformWindowPtr() {
+	ASSERT(gWindowsSpecific.windowCount > 0);
   return gWindowsSpecific.windows[0].hwnd;
 }
