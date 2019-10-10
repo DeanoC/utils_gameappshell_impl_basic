@@ -27,6 +27,7 @@ set(Src
 if (APPLE)
 	list(APPEND Src apple/macapp.hpp)
 	list(APPEND Src apple/macapp.mm)
+	list(APPEND Src apple/Info.plist.in)
 endif()
 if (WIN32)
 	list(APPEND Src windows/windows.cpp)

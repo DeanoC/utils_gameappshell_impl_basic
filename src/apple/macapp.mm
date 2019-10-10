@@ -29,196 +29,175 @@ AL2O3_EXTERN_C GameAppShell_Shell *GameAppShell_Init() {
 }
 
 AL2O3_EXTERN_C void GameAppShell_MainLoop(int argc, char const *argv[]) {
-	if (gGameAppShell.initialWindowDesc.name == NULL) {
-		gGameAppShell.initialWindowDesc.name = "No name for al2o3 app specified";
-	}
+
 	Os::FileSystem::SetCurrentDir(Os::FileSystem::GetExePath());
 	memcpy(&gMainWindow.desc, &gGameAppShell.initialWindowDesc, sizeof(GameAppShell_WindowDesc));
 
-	// never returns and ignores arguements.
-	NSApplicationMain(argc, (char const **) argv);
+	if (gGameAppShell.initialWindowDesc.width == -1 ||
+			gGameAppShell.initialWindowDesc.height == -1) {
+		gMainWindow.desc.width = 1920;
+		gMainWindow.desc.height = 1080;
+	}
+
+	[NSApplication sharedApplication];
+
+	id appName;
+	if (gGameAppShell.initialWindowDesc.name == NULL) {
+		appName = [[NSProcessInfo processInfo] processName];
+	} else {
+		appName = [NSString stringWithUTF8String:gGameAppShell.initialWindowDesc.name];
+	}
+	[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+	id menubar = [[NSMenu alloc] initWithTitle:appName];
+	id appMenuItem = [[NSMenuItem alloc] initWithTitle:appName action:NULL keyEquivalent:@""];
+	[menubar addItem:appMenuItem];
+	[NSApp setMainMenu:menubar];
+
+	id appMenu = [[NSMenu alloc] initWithTitle:appName];
+	id quitTitle = [@"Quit " stringByAppendingString:appName];
+	id quitMenuItem = [[NSMenuItem alloc] initWithTitle:quitTitle
+																							 action:@selector(terminate:) keyEquivalent:@"q"];
+	[appMenu addItem:quitMenuItem];
+	[appMenuItem setSubmenu:appMenu];
+
+	NSRect frame = NSMakeRect(0, 0, gMainWindow.desc.width, gMainWindow.desc.height);
+
+	NSWindow *window =
+			[[NSWindow alloc]
+					initWithContentRect:frame
+										styleMask:(NSWindowStyleMask) ( //NSWindowStyleMaskFullSizeContentView |
+												NSWindowStyleMaskTitled |
+												NSWindowStyleMaskResizable |
+												NSWindowStyleMaskClosable |
+												NSWindowStyleMaskMiniaturizable)
+											backing:NSBackingStoreBuffered
+												defer:YES];
+	[window center];
+	[window setTitle:appName];
+
+	GameViewController *gvc = [[GameViewController alloc] init];
+	[window setContentViewController:gvc];
+
+	[window makeKeyAndOrderFront:nil];
+	[NSApp activateIgnoringOtherApps:YES];
+	[NSApp setDelegate:gvc];
+	[NSApp run];
 }
+
 /************************************************************************/
 // GameViewController implementation
 /************************************************************************/
 
 @implementation GameViewController {
-	MTKView *_view;
-	id <MTLDevice> _device;
-	MetalKitApplication *_application;
 }
 
-- (void)viewDidLoad {
-	[super viewDidLoad];
-
+- (void)loadView {
 	// Set the view to use the default device
-	_device = MTLCreateSystemDefaultDevice();
-	_view = (MTKView *) self.view;
+	id device = MTLCreateSystemDefaultDevice();
+
+	NSRect frame = NSMakeRect(0, 0, gMainWindow.desc.width, gMainWindow.desc.height);
+	MTKView *_view = [[MTKView alloc] initWithFrame:frame device:device];
 	_view.delegate = self;
-	_view.device = _device;
+	gMainWindow.desc.width = _view.drawableSize.width;
+	gMainWindow.desc.height = _view.drawableSize.height;
+
+	self.view = _view;
+	gMainWindow.metalView = _view;
+
 	_view.paused = NO;
 	_view.enableSetNeedsDisplay = NO;
 	_view.preferredFramesPerSecond = 60;
-	[_view.window makeFirstResponder:self];
+	_view.translatesAutoresizingMaskIntoConstraints = NO;
 	_view.autoresizesSubviews = YES;
-
-	CGFloat scale = [_view.window backingScaleFactor];
-	gMainWindow.desc.dpiBackingScale[0] = (float) scale;
-	gMainWindow.desc.dpiBackingScale[1] = (float) scale;
-
-	if (!_device) {
-		NSLog(@"Metal is not supported on this device");
-		self.view = [[NSView alloc] initWithFrame:self.view.frame];
-	}
-
-	// Kick-off the MetalKitApplication.
-	_application = [[MetalKitApplication alloc] initWithMetalDevice:_device
-																				renderDestinationProvider:self
-																														 view:_view];
-
-	//register terminate callback
-	NSApplication *app = [NSApplication sharedApplication];
-	[[NSNotificationCenter defaultCenter] addObserver:self
-																					 selector:@selector(applicationWillTerminate:)
-																							 name:NSApplicationWillTerminateNotification
-																						 object:app];
-
-	[self.view.window makeKeyWindow];
-}
-
-/*A notification named NSApplicationWillTerminateNotification.*/
-- (void)applicationWillTerminate:(NSNotification *)notification {
-	[_application shutdown];
+	_view.clearColor = MTLClearColorMake(0, 0, 0, 1);
+	_view.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
 }
 
 - (BOOL)acceptsFirstResponder {
 	return TRUE;
 }
 
-- (BOOL)canBecomeKeyView {
-	return TRUE;
-}
-
 // Called whenever view changes orientation or layout is changed
 - (void)mtkView:(nonnull MTKView *)view drawableSizeWillChange:(CGSize)size {
-	view.window.contentView = _view;
-	[_application drawRectResized:view.bounds.size];
-}
 
-// Called whenever the view needs to render
-- (void)drawInMTKView:(nonnull MTKView *)view {
-	@autoreleasepool {
-		[_application update];
-		//this is needed for NON Vsync mode.
-		//This enables to force update the display
-		if (_view.enableSetNeedsDisplay == YES) {
-			[_view setNeedsDisplay:YES];
-		}
-	}
-}
-
-@end
-
-/************************************************************************/
-// MetalKitApplication implementation
-/************************************************************************/
-
-// Metal application implementation.
-@implementation MetalKitApplication {
-}
-
-- (nonnull instancetype)initWithMetalDevice:(nonnull id <MTLDevice>)device
-									renderDestinationProvider:(nonnull id <RenderDestinationProvider>)renderDestinationProvider
-																			 view:(nonnull MTKView *)view {
-	self = [super init];
-
-	if (self) {
-		gMainWindow.metalView = view;
-
-		if (gGameAppShell.initialWindowDesc.width == -1 ||
-				gGameAppShell.initialWindowDesc.height == -1) {
-			gMainWindow.desc.width = 1920;
-			gMainWindow.desc.height = 1080;
-		} else {
-			//if width and height were set manually in App constructor
-			//then override and set window size to user width/height.
-			//That means we now render at size * gRetinaScale.
-			//TODO: make sure pSettings->mWidth determines window size and not drawable size as on retina displays we need to make sure that's what user wants.
-			NSSize windowSize = CGSizeMake(gMainWindow.desc.width, gMainWindow.desc.height);
-			[view.window setContentSize:windowSize];
-			[view setFrameSize:windowSize];
-		}
-		NSString *nameNSString = [NSString stringWithUTF8String:gMainWindow.desc.name];
-		[view.window setTitle:nameNSString];
-
-		@autoreleasepool {
-			//if init fails then exit the app
-			if (!APP_CALLBACK_RET(onInitCallback)) {
-				for (NSWindow *window in [NSApplication sharedApplication].windows) {
-					[window close];
-				}
-				APP_ABORT
-			}
-
-			//if display load fails then exit the app
-			if (!APP_CALLBACK_RET(onDisplayLoadCallback)) {
-				for (NSWindow *window in [NSApplication sharedApplication].windows) {
-					[window close];
-				}
-				APP_ABORT
-			}
-
-		}
-	}
-
-	return self;
-}
-
-- (void)drawRectResized:(CGSize)size {
 	float const newWidth = (float) size.width;
 	float const newHeight = (float) size.height;
 
-	CGFloat scale = [gMainWindow.metalView.window backingScaleFactor];
-
 	if (newWidth != gMainWindow.desc.width ||
-			newHeight != gMainWindow.desc.height ||
-			scale != gMainWindow.desc.dpiBackingScale[0] ||
-			scale != gMainWindow.desc.dpiBackingScale[1]) {
+			newHeight != gMainWindow.desc.height) {
 
 		gMainWindow.desc.width = (uint32_t) newWidth;
 		gMainWindow.desc.height = (uint32_t) newHeight;
-		gMainWindow.desc.dpiBackingScale[0] = (float) scale;
-		gMainWindow.desc.dpiBackingScale[1] = (float) scale;
 
 		APP_CALLBACK(onDisplayUnloadCallback);
 		if (!APP_CALLBACK_RET(onDisplayLoadCallback)) {
 			APP_ABORT
 		}
 	}
-}
-
-- (void)update {
-
-	static double lastTimeMs = (double) Os_GetSystemTime();
-	double deltaTimeMS = Os_GetSystemTime() - lastTimeMs;
-	// if framerate appears to drop below about 6, assume we're at a breakpoint and simulate 20fps.
-	if (deltaTimeMS > 0.15) {
-		deltaTimeMS = 0.05;
-	}
-
-	if (gGameAppShell.perFrameUpdateCallback) {
-		gGameAppShell.perFrameUpdateCallback(deltaTimeMS);
-	}
-	if (gGameAppShell.perFrameDrawCallback) {
-		gGameAppShell.perFrameDrawCallback(deltaTimeMS);
-	}
 
 }
 
-- (void)shutdown {
+// Called whenever the view needs to render
+- (void)drawInMTKView:(nonnull MTKView *)view {
+	@autoreleasepool {
+		//this is needed for NON Vsync mode.
+		//This enables to force update the display
+		if (view.enableSetNeedsDisplay == YES) {
+			[view setNeedsDisplay:YES];
+		}
+
+		static double lastTimeMs = (double) Os_GetSystemTime();
+		double deltaTimeMS = Os_GetSystemTime() - lastTimeMs;
+		// if framerate appears to drop below about 6, assume we're at a breakpoint and simulate 20fps.
+		if (deltaTimeMS > 0.15) {
+			deltaTimeMS = 0.05;
+		}
+
+		if (gGameAppShell.perFrameUpdateCallback) {
+			gGameAppShell.perFrameUpdateCallback(deltaTimeMS);
+		}
+		if (gGameAppShell.perFrameDrawCallback) {
+			gGameAppShell.perFrameDrawCallback(deltaTimeMS);
+		}
+
+	}
+}
+- (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
+	LOGINFO("applicationDidFinishLaunching");
+	@autoreleasepool {
+		//if init fails then exit the app
+		if (!APP_CALLBACK_RET(onInitCallback)) {
+			for (NSWindow *window in [NSApplication sharedApplication].windows) {
+				[window close];
+			}
+			APP_ABORT
+		}
+
+		//if display load fails then exit the app
+		if (!APP_CALLBACK_RET(onDisplayLoadCallback)) {
+			for (NSWindow *window in [NSApplication sharedApplication].windows) {
+				[window close];
+			}
+			APP_ABORT
+		}
+
+	}
+}
+
+- (void)applicationWillTerminate:(NSNotification *)aNotification {
+	LOGINFO("applicationWillTerminate");
 	APP_CALLBACK(onDisplayUnloadCallback)
 	APP_CALLBACK(onQuitCallback)
 }
+
+- (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
+	return YES;
+}
+- (void)applicationWillHide:(NSNotification *)notification {
+	LOGINFO("applicationWillHide");
+
+}
+
 @end
 
 // GameAppShell Window API

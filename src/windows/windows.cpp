@@ -230,8 +230,6 @@ uint32_t WindowsSpecific::createWindow(GameAppShell_WindowDesc& desc) {
   GetClientRect(hwnd, &rc);
   desc.width = rc.right - rc.left;
   desc.height = rc.bottom - rc.top;
-  desc.dpiBackingScale[0] = 1.0f; // TODO when Windows backend is DPI aware
-	desc.dpiBackingScale[1] = 1.0f;
 
   gWindowsSpecific.getMessages();
   ShowWindow(hwnd, gWindowsSpecific.nCmdShow);
