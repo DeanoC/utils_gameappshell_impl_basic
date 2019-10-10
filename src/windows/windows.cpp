@@ -52,6 +52,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
       break;
     case WM_PAINT:ValidateRect(hWnd, NULL);
       break;
+  	case WM_SIZE: {
+			uint16_t width = LOWORD(lParam);
+			uint16_t height = HIWORD(lParam);
+
+			for (auto& window : gWindowsSpecific.windows) {
+				if(window.hwnd == hWnd &&
+					(width != window.desc.width || height != window.desc.height)) {
+					window.desc.width = width;
+					window.desc.height = height;
+					APP_CALLBACK(onDisplayResizeCallback);
+				}
+			}
+			break;
+		}
     default:return DefWindowProc(hWnd, message, wParam, lParam);
   }
   return 0;
@@ -121,7 +135,7 @@ void WindowsSpecific::getMessages(void) {
 			APP_CALLBACK1(onMsgCallback, &Message);
     }
   } else {
-    for (auto window : windows) {
+    for (auto& window : windows) {
       MSG Message;
       while (PeekMessage(&Message, window.hwnd, 0, 0, PM_REMOVE)) {
         TranslateMessage(&Message);
@@ -293,10 +307,6 @@ AL2O3_EXTERN_C void GameAppShell_MainLoop(int argc, char const *argv[]) {
 		APP_ABORT
 		return;
 	}
-	if(!APP_CALLBACK_RET(onDisplayLoadCallback)) {
-		APP_ABORT;
-		return;
-	}
 
 	while (gWindowsSpecific.windowsQuit == false) {
 		// TODO timing
@@ -312,7 +322,6 @@ AL2O3_EXTERN_C void GameAppShell_MainLoop(int argc, char const *argv[]) {
 		}
 	}
 
-	APP_CALLBACK(onDisplayUnloadCallback);
 	APP_CALLBACK(onQuitCallback)
 
 	gWindowsSpecific.destroyWindow(mainWindowIndex);
