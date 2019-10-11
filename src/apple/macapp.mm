@@ -129,10 +129,7 @@ AL2O3_EXTERN_C void GameAppShell_MainLoop(int argc, char const *argv[]) {
 		gMainWindow.desc.width = (uint32_t) newWidth;
 		gMainWindow.desc.height = (uint32_t) newHeight;
 
-		APP_CALLBACK(onDisplayUnloadCallback);
-		if (!APP_CALLBACK_RET(onDisplayLoadCallback)) {
-			APP_ABORT
-		}
+		APP_CALLBACK(onDisplayResizeCallback);
 	}
 
 }
@@ -173,20 +170,11 @@ AL2O3_EXTERN_C void GameAppShell_MainLoop(int argc, char const *argv[]) {
 			APP_ABORT
 		}
 
-		//if display load fails then exit the app
-		if (!APP_CALLBACK_RET(onDisplayLoadCallback)) {
-			for (NSWindow *window in [NSApplication sharedApplication].windows) {
-				[window close];
-			}
-			APP_ABORT
-		}
-
 	}
 }
 
 - (void)applicationWillTerminate:(NSNotification *)aNotification {
 	LOGINFO("applicationWillTerminate");
-	APP_CALLBACK(onDisplayUnloadCallback)
 	APP_CALLBACK(onQuitCallback)
 }
 
