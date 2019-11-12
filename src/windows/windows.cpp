@@ -22,6 +22,36 @@ namespace {
 GameAppShell_Shell gGameAppShell {};
 GameAppShellBasic_Win32Window gMainWindow {};
 
+// TODO tidy this up
+static int64_t highResTimerFrequency = 0;
+static void initTime()
+{
+	LARGE_INTEGER frequency;
+	if (QueryPerformanceFrequency(&frequency))
+	{
+		highResTimerFrequency = frequency.QuadPart;
+	}
+	else
+	{
+		highResTimerFrequency = 1000LL;
+	}
+}
+
+int64_t getTimerFrequency()
+{
+	if (highResTimerFrequency == 0)
+		initTime();
+
+	return highResTimerFrequency;
+}
+
+static int64_t getUSec()
+{
+	LARGE_INTEGER counter;
+	QueryPerformanceCounter(&counter);
+	return counter.QuadPart * (int64_t)1e6 / getTimerFrequency();
+}
+
 struct WindowsSpecific {
 	void createStandardArgs(LPSTR command_line);
 	void getMessages(void);
@@ -216,6 +246,7 @@ bool WindowsSpecific::registerClass(GameAppShell_WindowDesc const& desc) {
   return true;
 }
 
+
 uint32_t WindowsSpecific::createWindow(GameAppShell_WindowDesc& desc) {
   // Create window
   if (desc.width == -1 || desc.width == 0) {
@@ -308,9 +339,13 @@ AL2O3_EXTERN_C void GameAppShell_MainLoop(int argc, char const *argv[]) {
 		return;
 	}
 
+	int64_t hiFreqCount = getUSec();
+
 	while (gWindowsSpecific.windowsQuit == false) {
 		// TODO timing
-		double deltaTimeMS = 18.0;
+		int64_t const lastHiFreqCount = hiFreqCount;
+		hiFreqCount = getUSec();
+		double deltaTimeMS = (double)(hiFreqCount - lastHiFreqCount) / 1000.0;
 
 		gWindowsSpecific.getMessages();
 
