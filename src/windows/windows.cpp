@@ -1,5 +1,6 @@
 #include "al2o3_platform/platform.h"
 #include "al2o3_platform/windows.h"
+#include "al2o3_os/time.h"
 #include "utils_gameappshell/gameappshell.h"
 #include "utils_gameappshell/windows/platform.h"
 #include <fcntl.h>
