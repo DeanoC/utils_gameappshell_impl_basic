@@ -21,6 +21,7 @@ namespace {
 
 GameAppShell_Shell gGameAppShell = {};
 GameAppShellBasic_AppleWindow gMainWindow = {};
+int64_t hiFreqCount = 0;
 
 }
 
@@ -81,6 +82,8 @@ AL2O3_EXTERN_C void GameAppShell_MainLoop(int argc, char const *argv[]) {
 	[window makeKeyAndOrderFront:nil];
 	[NSApp activateIgnoringOtherApps:YES];
 	[NSApp setDelegate:gvc];
+
+	hiFreqCount = Os_GetUSec();
 	[NSApp run];
 }
 
@@ -143,12 +146,9 @@ AL2O3_EXTERN_C void GameAppShell_MainLoop(int argc, char const *argv[]) {
 			[view setNeedsDisplay:YES];
 		}
 
-		static double lastTimeMs = (double) Os_GetSystemTime();
-		double deltaTimeMS = Os_GetSystemTime() - lastTimeMs;
-		// if framerate appears to drop below about 6, assume we're at a breakpoint and simulate 20fps.
-		if (deltaTimeMS > 0.15) {
-			deltaTimeMS = 0.05;
-		}
+		int64_t const lastHiFreqCount = hiFreqCount;
+		hiFreqCount = Os_GetUSec();
+		double deltaTimeMS = (double)(hiFreqCount - lastHiFreqCount) / 1000.0;
 
 		if (gGameAppShell.perFrameUpdateCallback) {
 			gGameAppShell.perFrameUpdateCallback(deltaTimeMS);
